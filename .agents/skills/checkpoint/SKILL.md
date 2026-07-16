@@ -18,7 +18,8 @@ Marks "I'm done with this unit of work." Runs in order, does not skip step 8.
    (local `main` drifts from `origin/main` in active repos - see Safety/Git rules).
 5. **Show diff and confirm** - summarize what changed and why, get explicit
    confirmation before committing.
-6. **Push + open PR** - push the branch, `gh pr create` with a summary and test plan.
+6. **Push + open PR** - push the branch, `gh pr create --draft` with a summary and
+   test plan (see Git rules in AGENTS.md - draft unless told otherwise for that repo).
 7. **Win check** - one or two sentences: does this session's output clearly
    demonstrate value (the kind of thing worth mentioning in a promo packet)? If not,
    note what's missing - don't pad the PR to compensate.
