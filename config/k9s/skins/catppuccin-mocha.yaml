@@ -1,0 +1,83 @@
+# Catppuccin Mocha skin for k9s
+k9s:
+  body:
+    fgColor: "#cdd6f4"
+    bgColor: "#1e1e2e"
+    logoColor: "#cba6f7"
+  prompt:
+    fgColor: "#cdd6f4"
+    bgColor: "#1e1e2e"
+    suggestColor: "#89b4fa"
+  info:
+    fgColor: "#f9e2af"
+    sectionColor: "#cdd6f4"
+  dialog:
+    fgColor: "#cdd6f4"
+    bgColor: "#1e1e2e"
+    buttonFgColor: "#1e1e2e"
+    buttonBgColor: "#89b4fa"
+    buttonFocusFgColor: "#1e1e2e"
+    buttonFocusBgColor: "#f5c2e7"
+    labelFgColor: "#f9e2af"
+    fieldFgColor: "#cdd6f4"
+  frame:
+    border:
+      fgColor: "#585b70"
+      focusColor: "#b4befe"
+    menu:
+      fgColor: "#cdd6f4"
+      keyColor: "#f9e2af"
+      numKeyColor: "#f9e2af"
+    crumbs:
+      fgColor: "#1e1e2e"
+      bgColor: "#b4befe"
+      activeColor: "#89b4fa"
+    status:
+      newColor: "#a6e3a1"
+      modifyColor: "#f9e2af"
+      addColor: "#a6e3a1"
+      errorColor: "#f38ba8"
+      highlightColor: "#fab387"
+      killColor: "#6c7086"
+      completedColor: "#9399b2"
+    title:
+      fgColor: "#cdd6f4"
+      bgColor: "#1e1e2e"
+      highlightColor: "#f9e2af"
+      counterColor: "#89b4fa"
+      filterColor: "#f5c2e7"
+  views:
+    charts:
+      bgColor: default
+      defaultDialColors:
+        - "#a6e3a1"
+        - "#f38ba8"
+      defaultChartColors:
+        - "#a6e3a1"
+        - "#f38ba8"
+    table:
+      fgColor: "#cdd6f4"
+      bgColor: "#1e1e2e"
+      cursorFgColor: "#1e1e2e"
+      cursorBgColor: "#b4befe"
+      markColor: "#f5c2e7"
+      header:
+        fgColor: "#cdd6f4"
+        bgColor: "#1e1e2e"
+        sorterColor: "#89b4fa"
+    xray:
+      fgColor: "#cdd6f4"
+      bgColor: "#1e1e2e"
+      cursorColor: "#313244"
+      graphicColor: "#a6e3a1"
+      showIcons: false
+    yaml:
+      keyColor: "#cba6f7"
+      colonColor: "#89b4fa"
+      valueColor: "#cdd6f4"
+    logs:
+      fgColor: "#cdd6f4"
+      bgColor: "#1e1e2e"
+      indicator:
+        fgColor: "#89b4fa"
+        bgColor: "#1e1e2e"

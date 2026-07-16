@@ -1,0 +1,37 @@
+format = """
+$directory\
+$git_branch\
+$git_status\
+$kubernetes\
+$cmd_duration
+$character"""
+
+[directory]
+truncation_length = 3
+style = "bold cyan"
+
+[git_branch]
+symbol = " "
+style = "bold magenta"
+
+[git_status]
+style = "bold red"
+
+[cmd_duration]
+min_time = 2000
+style = "bold yellow"
+format = "took [$duration]($style) "
+
+[character]
+success_symbol = "[➜](bold green)"
+error_symbol = "[➜](bold red)"
+
+[kubernetes]
+disabled = false
+format = 'on [$symbol$context( \($namespace\))]($style) '
+symbol = "☸ "
+
+contexts = [
+  { context_pattern = ".*prod.*", style = "bold red" },
+  { context_pattern = ".*staging.*", style = "bold yellow" },
+]

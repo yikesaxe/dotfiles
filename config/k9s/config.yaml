@@ -1,0 +1,6 @@
+k9s:
+  ui:
+    skin: catppuccin-mocha
+    enableMouse: true
+    logoless: false
+  clusters: {}

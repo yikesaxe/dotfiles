@@ -1,0 +1,21 @@
+# Universal shell layer: prompt, tool integrations, aesthetics.
+# Sourced from ~/.zshrc, after the ansible-managed block - safe to edit freely.
+
+eval "$(starship init zsh)"
+eval "$(zoxide init zsh)"
+eval "$(atuin init zsh)"
+eval "$(thefuck --alias)"
+
+[[ -f /opt/homebrew/opt/fzf/shell/key-bindings.zsh ]] && source /opt/homebrew/opt/fzf/shell/key-bindings.zsh
+[[ -f /opt/homebrew/opt/fzf/shell/completion.zsh ]] && source /opt/homebrew/opt/fzf/shell/completion.zsh
+
+export BAT_THEME="Catppuccin Mocha"
+
+source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source ~/dotfiles/shell/catppuccin-mocha-zsh-syntax-highlighting.zsh
+
+alias cat="bat"
+alias find="fd"
+alias grep="rg"
+alias lg="lazygit"
+alias ad="agent-deck"
