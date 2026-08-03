@@ -28,7 +28,7 @@
     "trajectory": {
       "source": {
         "source": "directory",
-        "path": "/Users/axel.livias/.trajectory/claude-marketplace"
+        "path": "~/.trajectory/claude-marketplace"
       }
     }
   },
