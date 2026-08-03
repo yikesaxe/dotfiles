@@ -1,15 +1,37 @@
 {
+  "model": "opus[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "npx -y ccstatusline@latest",
+    "padding": 0,
+    "refreshInterval": 10
+  },
+  "enabledPlugins": {
+    "gopls-lsp@claude-plugins-official": false,
+    "datadog@claude-plugins-official": true,
+    "i-have-adhd@i-have-adhd": true,
+    "trajectory@trajectory": true
+  },
   "extraKnownMarketplaces": {
     "datadog-claude-plugins": {
       "source": {
         "source": "github",
         "repo": "DataDog/claude-marketplace"
       }
+    },
+    "i-have-adhd": {
+      "source": {
+        "source": "github",
+        "repo": "ayghri/i-have-adhd"
+      }
+    },
+    "trajectory": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/axel.livias/.trajectory/claude-marketplace"
+      }
     }
   },
-  "theme": "light",
-  "model": "opus[1m]",
-  "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": false
-  }
+  "effortLevel": "high",
+  "theme": "light"
 }

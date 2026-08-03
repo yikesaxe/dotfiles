@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""Local answer relay for visual-recap pages.
+
+Serves /tmp/visual-recap over http://127.0.0.1:<port> and answers POST /ask by
+shelling out to the already-authenticated `claude` CLI. Same-origin serving is
+the point: a page opened as file:// cannot fetch() a localhost endpoint in most
+browsers, and file:// origins are null, so CORS workarounds are fragile.
+
+The recap page sends its own prose as the context blob rather than the relay
+reading the repo: an experiment measured repo lookup (--add-dir + Read/Grep) at
+12s and it still failed to locate the package, versus 3.6s and an accurate
+answer when the page supplied context it already contained.
+
+Usage:
+    recap-relay                     # serve /tmp/visual-recap on port 8787
+    recap-relay --port 9000
+    recap-relay --dir /some/other/dir
+    RECAP_RELAY_MODEL=sonnet recap-relay
+
+Ctrl-C to stop. Nothing is left running in the background.
+"""
+
+import argparse
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+DEFAULT_DIR = "/tmp/visual-recap"
+DEFAULT_PORT = 8787
+DEFAULT_MODEL = os.environ.get("RECAP_RELAY_MODEL", "haiku")
+
+# Inputs are capped so a runaway selection (or a stray select-all) cannot turn
+# into a huge prompt.
+MAX_SELECTION = 2000
+MAX_CONTEXT = 12000
+ASK_TIMEOUT = 60
+
+# Closing the browser tab does not stop this process, so it shuts itself down
+# after a stretch with no requests rather than relying on the reader to
+# remember. 0 disables.
+DEFAULT_IDLE_TIMEOUT = 1800
+
+# How many pages --prune keeps.
+DEFAULT_KEEP = 5
+
+_last_activity = time.monotonic()
+_activity_lock = threading.Lock()
+
+
+def mark_activity() -> None:
+    global _last_activity
+    with _activity_lock:
+        _last_activity = time.monotonic()
+
+
+def idle_seconds() -> float:
+    with _activity_lock:
+        return time.monotonic() - _last_activity
+
+SYSTEM_PROMPT = (
+    "You explain terms to a reader working through a code-change recap page. "
+    "They have selected some text on that page and want it explained.\n"
+    "Use your own knowledge freely for general technical concepts (languages, "
+    "protocols, infrastructure, patterns) - the PAGE CONTEXT will not cover "
+    "those and is not meant to. Do not refuse a question you can answer just "
+    "because the context omits it.\n"
+    "For anything specific to this project - internal service names, types, "
+    "the ticket - treat PAGE CONTEXT as authoritative; it was written from the "
+    "actual source. Only there, if the context does not cover the selection, "
+    "say so in one sentence and give general background if you have it, rather "
+    "than inventing project specifics.\n"
+    "Answer in 2-4 plain sentences. No preamble, no markdown headers, no "
+    "bullet lists, no closing pleasantries.\n"
+    "Then end with a final line that is exactly one of:\n"
+    "SOURCE: page          (the answer came from PAGE CONTEXT)\n"
+    "SOURCE: general       (the answer came from your own knowledge)\n"
+    "SOURCE: not-covered   (project-specific and PAGE CONTEXT did not cover it)\n"
+    "The reader uses that tag to decide whether to trust the answer or go read "
+    "the source, so it must be accurate."
+)
+
+VALID_SOURCES = {"page", "general", "not-covered"}
+
+
+def split_source_tag(text: str) -> tuple[str, str]:
+    """Peel the trailing SOURCE: line off an answer.
+
+    Returned separately so the page can badge provenance instead of burying it
+    in prose. An answer missing the tag reports "unknown" rather than being
+    silently presented as grounded.
+    """
+    lines = text.rstrip().splitlines()
+    if lines:
+        candidate = lines[-1].strip().rstrip(".")
+        if candidate.lower().startswith("source:"):
+            source = candidate.split(":", 1)[1].strip().lower()
+            if source in VALID_SOURCES:
+                return "\n".join(lines[:-1]).rstrip(), source
+    return text.strip(), "unknown"
+
+# Read-only tools are disallowed rather than allowed: the page supplies context,
+# so tool access only adds latency and permission surface.
+DISALLOWED_TOOLS = "Bash Read Write Edit Glob Grep WebSearch WebFetch Task"
+
+
+def ask_claude(selection: str, context: str, model: str) -> tuple[str, str]:
+    prompt = f"PAGE CONTEXT:\n{context}\n\nSELECTED TEXT:\n{selection}"
+    result = subprocess.run(
+        [
+            "claude",
+            "-p",
+            "--model",
+            model,
+            # No MCP servers: this repo's MCP set adds seconds of startup for
+            # tools this prompt never uses.
+            "--strict-mcp-config",
+            "--disallowed-tools",
+            DISALLOWED_TOOLS,
+            "--system-prompt",
+            SYSTEM_PROMPT,
+            prompt,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=ASK_TIMEOUT,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "claude exited non-zero")
+    return split_source_tag(result.stdout)
+
+
+class RelayHandler(SimpleHTTPRequestHandler):
+    model = DEFAULT_MODEL
+
+    def do_GET(self):
+        mark_activity()
+        super().do_GET()
+
+    def do_POST(self):
+        mark_activity()
+        if self.path.rstrip("/") != "/ask":
+            self.send_error(404, "only POST /ask is supported")
+            return
+
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            self.send_error(400, "bad Content-Length")
+            return
+        if length <= 0 or length > MAX_SELECTION + MAX_CONTEXT + 1024:
+            self.send_error(400, "empty or oversized body")
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length))
+            selection = str(payload["selection"])[:MAX_SELECTION].strip()
+            context = str(payload.get("context", ""))[:MAX_CONTEXT].strip()
+        except (json.JSONDecodeError, KeyError, TypeError, UnicodeDecodeError):
+            self.send_error(400, "body must be JSON with a 'selection' field")
+            return
+        if not selection:
+            self.send_error(400, "'selection' is empty")
+            return
+
+        preview = selection if len(selection) <= 60 else selection[:57] + "..."
+        print(f"  ask: {preview}", flush=True)
+
+        try:
+            answer, source = ask_claude(selection, context, self.model)
+            body = json.dumps({"answer": answer, "source": source}).encode()
+            status = 200
+        except subprocess.TimeoutExpired:
+            body = json.dumps({"error": f"claude timed out after {ASK_TIMEOUT}s"}).encode()
+            status = 504
+        except (RuntimeError, OSError) as err:
+            body = json.dumps({"error": str(err)}).encode()
+            status = 502
+
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, fmt, *args):
+        # Default logging narrates every static asset fetch; only failures and
+        # the /ask lines printed above are worth seeing.
+        if args and isinstance(args[0], str) and " 200 " not in args[0]:
+            super().log_message(fmt, *args)
+
+
+def recap_pages(directory: str) -> list[str]:
+    """Recap HTML files in directory, newest first."""
+    paths = [
+        os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(".html")
+    ]
+    return sorted(paths, key=os.path.getmtime, reverse=True)
+
+
+def prune(directory: str, keep: int, dry_run: bool) -> int:
+    """Delete all but the newest `keep` recap pages.
+
+    Count-based rather than age-based on purpose: macOS tmp_cleaner already
+    sweeps /tmp daily for anything untouched for 3 days, so age is covered. What
+    it will not do is thin out a pile of pages from one active week, and it never
+    touches a page you keep reopening (atime keeps resetting).
+    """
+    pages = recap_pages(directory)
+    doomed = pages[keep:]
+    if not doomed:
+        print(f"recap-relay: {len(pages)} page(s), nothing to prune (keeping {keep})")
+        return 0
+
+    verb = "would delete" if dry_run else "deleting"
+    total = 0
+    for path in doomed:
+        size = os.path.getsize(path)
+        total += size
+        print(f"  {verb}: {os.path.basename(path)} ({size // 1024}K)")
+        if not dry_run:
+            os.remove(path)
+    print(
+        f"recap-relay: {'would free' if dry_run else 'freed'} {total // 1024}K "
+        f"across {len(doomed)} page(s); kept newest {min(keep, len(pages))}"
+    )
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--dir", default=DEFAULT_DIR)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--idle-timeout",
+        type=int,
+        default=DEFAULT_IDLE_TIMEOUT,
+        help=f"shut down after N idle seconds; 0 to disable (default {DEFAULT_IDLE_TIMEOUT})",
+    )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="delete all but the newest --keep pages, then exit (no server)",
+    )
+    parser.add_argument("--keep", type=int, default=DEFAULT_KEEP)
+    parser.add_argument(
+        "--dry-run", action="store_true", help="with --prune, list without deleting"
+    )
+    args = parser.parse_args()
+
+    if not os.path.isdir(args.dir):
+        print(f"recap-relay: {args.dir} does not exist", file=sys.stderr)
+        return 1
+    if args.prune:
+        return prune(args.dir, max(0, args.keep), args.dry_run)
+    if shutil.which("claude") is None:
+        print("recap-relay: `claude` is not on PATH", file=sys.stderr)
+        return 1
+
+    RelayHandler.model = args.model
+    handler = lambda *a, **kw: RelayHandler(*a, directory=args.dir, **kw)  # noqa: E731
+
+    # 127.0.0.1, never 0.0.0.0: this endpoint runs a subprocess on request and
+    # has no auth, so it must not be reachable off-host.
+    with ThreadingHTTPServer(("127.0.0.1", args.port), handler) as httpd:
+        print(f"recap-relay: serving {args.dir} on http://127.0.0.1:{args.port}")
+        print(f"recap-relay: model={args.model}  (Ctrl-C to stop)")
+        pages = recap_pages(args.dir)
+        if pages:
+            newest = os.path.basename(pages[0])
+            print(f"recap-relay: newest page -> http://127.0.0.1:{args.port}/{newest}")
+            total = sum(os.path.getsize(p) for p in pages) // 1024
+            note = f"recap-relay: {len(pages)} page(s), {total}K in {args.dir}"
+            if len(pages) > args.keep:
+                note += f" - `--prune` would drop {len(pages) - args.keep}"
+            print(note)
+
+        if args.idle_timeout > 0:
+            print(f"recap-relay: will exit after {args.idle_timeout}s idle")
+
+            def watch_idle():
+                while True:
+                    remaining = args.idle_timeout - idle_seconds()
+                    if remaining <= 0:
+                        print(
+                            f"\nrecap-relay: idle for {args.idle_timeout}s, shutting down",
+                            flush=True,
+                        )
+                        httpd.shutdown()
+                        return
+                    time.sleep(min(remaining, 15))
+
+            threading.Thread(target=watch_idle, daemon=True).start()
+
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nrecap-relay: stopped")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

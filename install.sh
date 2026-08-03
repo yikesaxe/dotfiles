@@ -26,7 +26,7 @@ link "$DOTFILES/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link "$DOTFILES/.claude/settings.json" "$HOME/.claude/settings.json"
 
 link "$DOTFILES/config/ghostty/config" "$HOME/.config/ghostty/config"
-link "$DOTFILES/config/starship/starship.toml" "$HOME/.config/starship/starship.toml"
+link "$DOTFILES/config/starship/starship.toml" "$HOME/.config/starship.toml"
 link "$DOTFILES/config/lazygit/config.yml" "$HOME/.config/lazygit/config.yml"
 link "$DOTFILES/config/k9s" "$HOME/.config/k9s"
 link "$DOTFILES/config/tmux.conf" "$HOME/.tmux.conf"
