@@ -61,11 +61,36 @@ this file based on feedback about what was/wasn't useful - this is not settled.
    CSS, no build step, no external files. See "Cognitive-load rules" below for
    the concrete layout/typography constraints this section must follow.
 7. **Write it to `/tmp/visual-recap/<slug>-<YYYYMMDD-HHMMSS>.html`** (slug from the
-   ticket key or branch name). Open it with `open <path>` on macOS, guarded by
-   `command -v open`.
-8. Tell the user the file path and what's in it. Ask what worked or didn't -
-   feed that back into this SKILL.md rather than silently reverting to plain
-   markdown next time.
+   ticket key or branch name).
+8. **Serve it, don't open the file path.** Opening `file:///tmp/...` makes the
+   relative `POST /ask` fail, so "Ask about this" silently degrades to a clipboard
+   copy. Always try to reach the page over HTTP first:
+   1. Find a relay already serving `/tmp/visual-recap`. A listening port is NOT
+      proof - confirm the process with `ps -p <pid> -o args=` and check it is
+      `recap-relay`. **Do not assume 8787 is the relay**: Datadog's
+      `headroom proxy` commonly occupies it, and it answers 404 for these files
+      rather than failing loudly.
+   2. If no relay is running, start one on a free port
+      (`~/dotfiles/bin/recap-relay --port 9000`, backgrounded), guarded by a
+      `-x` check on the script. Poll until `curl` reaches `/`.
+   3. Verify the page itself with
+      `curl -s -o /dev/null -w '%{http_code}' <url>` and require `200` before
+      opening - a served root does not imply the file is served.
+   4. `open <url>` on macOS, guarded by `command -v open`.
+   5. Smoke-test `/ask` itself before declaring it working - a `200` on the page
+      says nothing about the endpoint. `curl -X POST .../ask` with a real
+      `{"selection","context"}` body and require a `200` plus an `answer` field.
+   Note the relay **exits after 1800s idle**. It will therefore be dead on any
+   session that returns to an older page, and the symptom is a silent drop back to
+   clipboard copying. Re-probe and restart rather than assuming a relay started
+   earlier is still up, and launch it detached (`nohup ... &`) so it is not tied to
+   a single tool call.
+   Fall back to `open <path>` only when the relay script is missing or won't
+   start, and say so explicitly, because inline answers will not work in that
+   case.
+9. Tell the user the URL (or path, if it fell back) and what's in it. Ask what
+   worked or didn't - feed that back into this SKILL.md rather than silently
+   reverting to plain markdown next time.
 
 ## Cognitive-load rules
 
@@ -148,6 +173,16 @@ conversation. Applies to every generated page:
   ```js
   function toggleGloss(btn) { btn.nextElementSibling.classList.toggle('open'); }
   ```
+  Pair this with a `showAnswer(selection, answer, source)` helper and a fixed
+  dismissible panel (bottom-right, `max-height:70vh; overflow-y:auto`,
+  `white-space:pre-wrap`) that shows the answer plus its `source:` tag. Do not use
+  `alert()` - it blocks the page and loses the answer on dismiss.
+
+  **The relay's `/ask` contract**, so this doesn't have to be rediscovered:
+  request `{"selection": "...", "context": "..."}`, response
+  `{"answer": "...", "source": "page" | "general" | "unknown"}`. Any other request
+  field name returns `400`.
+
   A real `<button>` gets keyboard access (Enter/Space) for free - don't
   substitute a bare `<span onclick>`. Only glossary-ize terms this page can
   actually define well in 1-2 sentences; if a question needs more than that,
@@ -185,10 +220,26 @@ conversation. Applies to every generated page:
       btn.style.top = (rect.bottom + 6) + 'px';
       btn.style.display = 'block';
       btn.onclick = function () {
-        var question = 'From "' + pageContext + '", explain: "' + text + '"';
-        navigator.clipboard.writeText(question);
-        btn.textContent = 'Copied — paste in chat';
-        setTimeout(function () { btn.style.display = 'none'; btn.textContent = 'Ask about this'; }, 1500);
+        btn.textContent = 'Asking...';
+        // The relay's field MUST be named "selection" - it 400s on anything else.
+        // And fetch() resolves on 4xx/5xx, so r.ok must be checked explicitly:
+        // without it, a relay error is indistinguishable from no relay at all and
+        // the clipboard fallback fires while the relay is running perfectly.
+        fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ selection: text, context: PAGE_CONTEXT })
+        }).then(function (r) {
+          if (!r.ok) { throw new Error('relay ' + r.status); }
+          return r.json();          // -> { answer, source }
+        }).then(function (d) {
+          showAnswer(text, d.answer || '(empty answer)', d.source || 'unknown');
+          btn.style.display = 'none'; btn.textContent = 'Ask about this';
+        }).catch(function () {
+          navigator.clipboard.writeText('From "' + pageContext + '", explain: "' + text + '"');
+          btn.textContent = 'No relay — copied';   // name the fallback, don't hide it
+          setTimeout(function () { btn.style.display = 'none'; btn.textContent = 'Ask about this'; }, 1800);
+        });
       };
     });
     document.addEventListener('mousedown', function (e) {

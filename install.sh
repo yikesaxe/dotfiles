@@ -21,6 +21,7 @@ link() {
 
 link "$DOTFILES/.agents/AGENTS.md" "$HOME/.agents/AGENTS.md"
 link "$DOTFILES/.agents/skills" "$HOME/.agents/skills"
+link "$DOTFILES/.agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
 link "$HOME/.agents/skills" "$HOME/.claude/skills"
 link "$DOTFILES/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link "$DOTFILES/.claude/settings.json" "$HOME/.claude/settings.json"
