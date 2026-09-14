@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Teammate PR"
+  short_description: "Review a teammate PR with evidence"
+  default_prompt: "Use $review-teammate-pr to review this pull request without posting comments."
