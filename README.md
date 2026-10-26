@@ -7,7 +7,8 @@ Personal config for this machine. Run `install.sh` to symlink everything into pl
 
 - `.agents/AGENTS.md` - cross-tool agent rules (Claude Code, Cursor, etc.), the
   single source of truth for agent behavior.
-- `.agents/skills/` - the checkpoint/retro/triage learning loop.
+- `.agents/skills/` - reusable workflows, including PR descriptions, teammate
+  reviews, and the checkpoint/retro/triage learning loop.
 - `.claude/` - Claude-Code-specific config that imports/wraps the above.
 - `config/` - Catppuccin Mocha theming and app config for ghostty, starship,
   lazygit, k9s, and tmux.
@@ -50,3 +51,54 @@ readlink "$HOME/.codex/AGENTS.md"
 readlink "$HOME/.claude/CLAUDE.md"
 readlink "$HOME/.claude/settings.json"
 ```
+
+## PR descriptions
+
+Use `$pr-description` in Codex or `/pr-description` in Claude Code. The shared
+rules also select it when you ask to draft or revise your own PR description.
+It adapts Paul Saulue-Laborde's audience-tiered writing workflow: a short
+overview, conceptual changes, useful examples or diagrams, real design
+tradeoffs, and verified testing evidence. Detail scales with the change.
+
+The draft is a local Markdown file for review. Approval is required before
+creating or updating the hosted PR description. It does not change Git safety
+rules, publish reviews, or merge anything. `checkpoint` uses the same workflow.
+
+## Updating existing Workspaces
+
+This repository is `yikesaxe/dotfiles`, separate from Datadog's shared
+`ddoghq/workspaces-dotfiles` repository. Only committed and pushed changes are
+available to a Workspace pulling from GitHub; local edits do not propagate.
+
+On a Workspace already installed from this repository, inspect its checkout:
+
+```shell
+cd "$HOME/dotfiles"
+git remote -v
+git status --short
+git branch --show-current
+```
+
+If the remote is your intended `yikesaxe/dotfiles` repository, the checkout is
+clean, and its branch tracks the intended remote branch, update it with:
+
+```shell
+git pull --ff-only
+```
+
+Existing symlinks pick up changed rules and skills immediately on disk. Start a
+new Codex or Claude session to reload them. If the symlinks are missing or the
+installer changed, review `install.sh`, then run `./install.sh`. It reapplies
+all managed config, not just agent skills, and backs up existing real files.
+Do not overwrite remote edits or resolve divergence by resetting the checkout.
+
+If you instead registered your setup in Datadog's shared dotfiles repository,
+publish changes there through its normal review flow, then run on your Mac:
+
+```shell
+workspaces dotfiles sync WORKSPACE_NAME
+```
+
+Replace `WORKSPACE_NAME` with the exact target. Omitting it syncs all active
+Workspaces. This command uses the shared repository, not this personal repo.
+Do not migrate or change your configured dotfiles source merely to update a skill.

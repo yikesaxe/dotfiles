@@ -291,6 +291,10 @@ truth; tool-specific configs import it rather than duplicating it.
   aggregate status.
 
 ## Skills
+- Use `pr-description` when drafting or revising a PR description. Ground it in
+  the actual diff and verified tests, surface a draft file for review, and obtain
+  approval of the description before publishing it. Keep repository-required
+  fields and existing Git rules; the skill does not authorize commits or pushes.
 - Whenever a skill is added, removed, or has its behavior meaningfully changed,
   update the "Claude Skills" note in the Obsidian vault
   (`04 learning/Tips n Tricks/Claude Skills.md`) to match - keep that note as the

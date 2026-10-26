@@ -18,8 +18,11 @@ Marks "I'm done with this unit of work." Runs in order, does not skip step 8.
    (local `main` drifts from `origin/main` in active repos - see Safety/Git rules).
 5. **Show diff and confirm** - summarize what changed and why, get explicit
    confirmation before committing.
-6. **Push + open PR** - push the branch, `gh pr create --draft` with a summary and
-   test plan (see Git rules in AGENTS.md - draft unless told otherwise for that repo).
+6. **Draft, approve, then publish PR** - use `pr-description` to write the summary,
+   design rationale, and verified test evidence to a reviewable file. Obtain
+   explicit approval of the description before publishing. Once the commit/push
+   and PR creation are authorized, push and use the approved file with
+   `gh pr create --draft --body-file` (see Git rules in AGENTS.md).
 7. **Win check** - one or two sentences: does this session's output clearly
    demonstrate value (the kind of thing worth mentioning in a promo packet)? If not,
    note what's missing - don't pad the PR to compensate.
