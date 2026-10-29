@@ -64,6 +64,28 @@ The draft is a local Markdown file for review. Approval is required before
 creating or updating the hosted PR description. It does not change Git safety
 rules, publish reviews, or merge anything. `checkpoint` uses the same workflow.
 
+## Pstack skills
+
+The selected pstack skills are saved under `.agents/skills/`: `bro`, `teach`,
+`how`, `why`, and `unslop`. The last three support `teach`. Their references
+are included, so they do not depend on a plugin cache. The existing installer
+links this directory for Codex and Claude Code; restart the agent session
+after installing or updating it.
+
+These are standalone skills: use `$bro` or `$teach` in Codex, or `/bro` or
+`/teach` in Claude Code. A separately installed pstack plugin also exposes its
+own `pstack:` entries. The standalone copies do not require that plugin.
+
+The existing `review-teammate-pr` skill is also included for reviewing other
+people's PRs. Use `$review-teammate-pr` in Codex or `/review-teammate-pr` in
+Claude Code. Use `pr-description` for writing up your own changes.
+
+Source: [painhardcore/pstack](https://github.com/painhardcore/pstack/tree/04830a98367e41c79d1565e0c4903cc6ddedce1b),
+version `1.1.0`, commit `04830a98367e41c79d1565e0c4903cc6ddedce1b`.
+The selected skill files match that snapshot. The original
+[MIT license](.agents/skills/PSTACK-LICENSE) is included. Updates are manual;
+updating the separately installed plugin does not update these copies.
+
 ## Updating existing Workspaces
 
 This repository is `yikesaxe/dotfiles`, separate from Datadog's shared
